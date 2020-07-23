@@ -1,0 +1,351 @@
+{
+  "name": "CMLInference",
+  "type": "flogo:app",
+  "version": "0.0.2",
+  "description": "",
+  "appModel": "1.1.0",
+  "imports": [
+    "github.com/project-flogo/catalystml-flogo/action",
+    "github.com/project-flogo/aws-contrib/trigger/lambda",
+    "github.com/project-flogo/contrib/activity/actreturn",
+    "github.com/project-flogo/contrib/activity/log",
+    "github.com/project-flogo/contrib/activity/runaction",
+    "github.com/project-flogo/contrib/trigger/rest",
+    "github.com/project-flogo/flow",
+    "github.com/project-flogo/flow/activity/subflow"
+  ],
+  "triggers": [
+    {
+      "id": "aws_lambda_trigger",
+      "ref": "#lambda",
+      "settings": null,
+      "handlers": [
+        {
+          "settings": null,
+          "actions": [
+            {
+              "ref": "#flow",
+              "settings": {
+                "flowURI": "res://flow:fraud_detection"
+              },
+              "input": {
+                "Age": "=$.event.Age",
+                "Amount": "=$.event.Amount",
+                "bank": "=$.event.bank",
+                "cardType": "=$.event.cardType",
+                "entry_type": "=$.event.entry_type",
+                "fraud": "=$.event.fraud",
+                "gender": "=$.event.gender",
+                "transaction": "=$.event.transaction",
+                "v1": "=$.event.v1",
+                "v2": "=$.event.v2",
+                "v3": "=$.event.v3",
+                "v4": "=$.event.v4"
+              },
+              "output": {
+                "data": "=$.transformedOut"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "receive_http_message",
+      "ref": "#rest",
+      "settings": {
+        "port": 9999
+      },
+      "handlers": [
+        {
+          "settings": {
+            "method": "POST",
+            "path": "/fraud"
+          },
+          "actions": [
+            {
+              "ref": "#flow",
+              "settings": {
+                "flowURI": "res://flow:fraud_detection"
+              },
+              "input": {
+                "Age": "=$.content.Age",
+                "Amount": "=$.content.Amount",
+                "bank": "=$.content.bank",
+                "cardType": "=$.content.cardType",
+                "entry_type": "=$.content.entry_type",
+                "fraud": "=$.content.fraud",
+                "gender": "=$.content.gender",
+                "transaction": "=$.content.transaction",
+                "v1": "=$.content.v1",
+                "v2": "=$.content.v2",
+                "v3": "=$.content.v3",
+                "v4": "=$.content.v4",
+                "content":"=$.content"
+              },
+              "output": {
+                "code": 200,
+                "data": "=$.transformedOut"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "id": "flow:fraud_detection",
+      "data": {
+        "name": "FraudDetection",
+        "metadata": {
+          "input": [
+            {
+              "name": "Age",
+              "type": "integer"
+            },
+            {
+              "name": "Amount",
+              "type": "double"
+            },
+            {
+              "name": "bank",
+              "type": "string"
+            },
+            {
+              "name": "cardType",
+              "type": "string"
+            },
+            {
+              "name": "entry_type",
+              "type": "string"
+            },
+            {
+              "name": "gender",
+              "type": "string"
+            },
+            {
+              "name": "transaction",
+              "type": "string"
+            },
+            {
+              "name": "v1",
+              "type": "double"
+            },
+            {
+              "name": "v2",
+              "type": "double"
+            },
+            {
+              "name": "v3",
+              "type": "double"
+            },
+            {
+              "name": "v4",
+              "type": "double"
+            },
+            {
+              "name": "fraud",
+              "type": "integer"
+            },
+            {
+              "name": "content",
+              "type": "any"
+            }
+
+          ],
+          "output": [
+            {
+              "name": "transformedOut",
+              "type": "object"
+            }
+          ]
+        },
+        "tasks": [
+          {            
+            "id": "log_9",
+            "name": "Log",
+            "description": "Logs a message",
+            "activity": {
+              "ref": "#log",
+              "input": {
+                "addDetails": false,
+                "message": "=$flow.content"
+              }
+            }
+          },
+          {
+            "id": "log_2",
+            "name": "Log",
+            "description": "Logs a message",
+            "activity": {
+              "ref": "#log",
+              "input": {
+                "addDetails": false,
+                "message": "Start"
+              }
+            }
+          },
+
+          {
+            "id": "subflow_3",
+            "name": "CallCatalystML",
+            "activity": {
+              "ref": "#subflow",
+              "input": {
+                "cmlIn": {
+                  "mapping": [
+                    {
+                      "Age": "=$flow.Age",
+                      "Amount": "=$flow.Amount",
+                      "bank": "=$flow.bank",
+                      "cardType": "=$flow.cardType",
+                      "entry_type": "=$flow.entry_type",
+                      "fraud": "=$flow.fraud",
+                      "gender": "=$flow.gender",
+                      "transaction": "=$flow.transaction",
+                      "v1": "=$flow.v1",
+                      "v2": "=$flow.v2",
+                      "v3": "=$flow.v3",
+                      "v4": "=$flow.v4"
+                    }
+                  ]
+                }
+              },
+              "settings": {
+                "flowURI": "res://flow:call_catalyst_ml"
+              }
+            }
+          },
+          {
+            "id": "actreturn_4",
+            "name": "Return",
+            "description": "Return Activity",
+            "activity": {
+              "ref": "#actreturn",
+              "settings": {
+                "mappings": {
+                  "transformedOut": "=$activity[subflow_3].transformedData"
+                }
+              }
+            }
+          }
+        ],
+        "links": [
+          {
+            "from": "log_9",
+            "to": "log_2"
+          },
+          {
+            "from": "log_2",
+            "to": "subflow_3"
+          },
+          {
+            "from": "subflow_3",
+            "to": "actreturn_4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "flow:call_catalyst_ml",
+      "data": {
+        "name": "CallCatalystML",
+        "metadata": {
+          "input": [
+            {
+              "name": "cmlIn",
+              "type": "array"
+            }
+          ],
+          "output": [
+            {
+              "name": "transformedData",
+              "type": "object"
+            }
+          ]
+        },
+        "tasks": [
+          {
+            "id": "log_12",
+            "name": "Log",
+            "description": "Logs a message",
+            "activity": {
+              "ref": "#log",
+              "input": {
+                "addDetails": false,
+                "message": "=$flow.cmlIn"
+              }
+            }
+          },
+          {
+            "id": "cml",
+            "name": "Run a Sync Action",
+            "description": "Run a SyncAction in activity",
+            "activity": {
+              "ref": "#runaction",
+              "input": {
+                "inputs": "=$flow.cmlIn"
+              },
+              "settings": {
+                "actionRef": "github.com/project-flogo/catalystml-flogo/action",
+                "actionSettings": {
+                    "catalystMlURI": "file://findata_1583171736.json"
+                }
+              }
+            }
+          },
+          {
+            "id": "inference_ml",
+            "name": "Making Inference",
+            "description": "Making Inference",
+            "activity": {
+              "ref": "github.com/project-flogo/ml/activity/inference",
+              "input": {
+                "model": "archive.zip",
+                "framework": "Tensorflow",
+                "features": {"mapping":[
+                    {
+                    "data":"=$activity[cml].output.data",
+                    "name":"inputs"
+                    }
+                  ]
+                  
+                },
+                "sigDefName": "serving_default",
+                "tag": "serve"
+              }
+            }
+          },
+          {
+            "id": "actreturn_4",
+            "name": "Return",
+            "description": "Return Activity",
+            "activity": {
+              "ref": "#actreturn",
+              "settings": {
+                "mappings": {
+                  "transformedData": "=$activity[inference_ml].result.Yout"
+                }
+              }
+            }
+          }
+        ],
+        "links": [
+          {
+            "from":"log_12",
+            "to":"cml"
+          },
+          {
+            "from": "cml",
+            "to": "inference_ml"
+          },
+          {
+            "from": "inference_ml",
+            "to": "actreturn_4"
+          }
+        ]
+      }
+    }
+  ]
+}
